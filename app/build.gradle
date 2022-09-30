@@ -1,0 +1,89 @@
+plugins {
+    id("com.github.johnrengelman.shadow") version "7.1.2"
+    id("io.micronaut.minimal.application") version "3.6.2"
+}
+
+version = "0.1"
+group = "app"
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    annotationProcessor("io.micronaut:micronaut-http-validation")
+    implementation("io.micronaut:micronaut-http-client")
+    implementation("io.micronaut:micronaut-jackson-databind")
+    implementation("jakarta.annotation:jakarta.annotation-api")
+    runtimeOnly("ch.qos.logback:logback-classic")
+    implementation("io.micronaut:micronaut-validation")
+
+}
+
+
+application {
+    mainClass.set("app.Application")
+}
+java {
+    sourceCompatibility = JavaVersion.toVersion("11")
+    targetCompatibility = JavaVersion.toVersion("11")
+}
+
+micronaut {
+    runtime("netty")
+    testRuntime("junit5")
+    processing {
+        incremental(true)
+        annotations("app.*")
+    }
+}
+
+// Before reading the following, please read the Svelte project build script
+
+// Now we're going to consume the Svelte app as resources for this project
+// For this, we're going to create a _consumer_ configuration
+configurations {
+   incomingSvelteApp {
+       canBeResolved = true   // This is a *consumer*
+       canBeConsumed = false
+   }
+}
+
+// On this configuration we declare a dependency on the svelte project
+// We're using _simple_ artifact sharing as documented at https://docs.gradle.org/current/userguide/cross_project_publications.html#sec:simple-sharing-artifacts-between-projects
+dependencies {
+    incomingSvelteApp project(path:":svelte", configuration: 'svelteOutgoingElements')
+}
+
+// Our application will serve from /static, so we need a task to copy the resources in a base
+// directory, but then have a "static" subdirectory with our resources
+def svelteApp = tasks.register("copySvelteResources", CopyStaticPages) {
+    // add our svelte app as an input, but we can add other resources as needed
+    contents.from(configurations.incomingSvelteApp)
+    outputDirectory = layout.buildDirectory.dir("external-resources")
+}
+
+// And now we need to tell Gradle that we have another resource directory
+// This is enough for Gradle to trigger the svelte app build if needed
+sourceSets.main.resources.srcDir(svelteApp)
+
+
+abstract class CopyStaticPages extends DefaultTask {
+    @InputFiles
+    abstract ConfigurableFileCollection getContents()
+    
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+    
+    @Inject
+    abstract FileSystemOperations getFs()
+    
+    @TaskAction
+    void copy() {
+        def outputDir = outputDirectory.get().asFile
+        fs.copy {
+           into(new File(outputDir, "static"))
+           from(contents.files)
+        }
+    }
+}

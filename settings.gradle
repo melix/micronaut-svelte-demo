@@ -1,0 +1,6 @@
+
+rootProject.name="svelte-micronaut"
+
+include 'svelte'
+include 'app'
+

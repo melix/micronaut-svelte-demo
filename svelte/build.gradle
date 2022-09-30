@@ -1,0 +1,62 @@
+/**
+ * This build file emulates a project which would call svelte to
+ * generate some static web pages, which need to be included in
+ * the Micronaut app. Everything is done in the build script for
+ * the sake of demonstrating, but the "setup" phase should be done
+ * in a convention plugin, so that the build script is only declarative.
+ */
+ 
+plugins {
+   id 'base'
+}
+
+// First, we're going to create an "outgoing" configuration, which will
+// contain the deliverables that we want to expose to our Micronaut app
+
+configurations {
+    svelteOutgoingElements {
+        canBeResolved = false
+        canBeConsumed = true // this is an *outgoing* configuration
+    }
+}
+
+// Then we define a task which will generate our Svelte app
+def svelteTask = tasks.register("svelte", Svelte) {
+    message = "Hello, Jeff!"
+    outputDirectory = layout.buildDirectory.dir("svelte")
+}
+
+// Now, we expose the output of the svelte task as an artifact
+// on the outgoing configuration
+
+configurations {
+    svelteOutgoingElements {
+        outgoing.artifact(svelteTask)
+    }
+}
+
+// We're almost done, let's make the Svelte task do something
+// This is where you'll have to integrate with Svelte
+
+abstract class Svelte extends DefaultTask {
+    @Input
+    abstract Property<String> getMessage()
+    
+    @OutputDirectory
+    abstract DirectoryProperty getOutputDirectory()
+    
+    @TaskAction
+    void renderPages() {
+        new File(outputDirectory.get().asFile, 'index.html').withWriter { writer ->
+            writer.println """<html>
+    <body>
+    ${message.get()}
+    </body>
+</html>            
+            """
+        }
+    }
+
+}
+
+
